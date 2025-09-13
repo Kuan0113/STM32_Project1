@@ -26,9 +26,13 @@
 | PA5  | LD2 LED          | Output Push-Pull | None |
 | PC13 | User Button B1   | GPIO_EXTI13    | Pull-Up |
 
+![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/gpio_setting.png)
+
 ### NVIC
 
-- `EXTI15_10_IRQn` enabled for PC13 interrupt.  
+- `EXTI15_10_IRQn` enabled for PC13 interrupt.
+   
+![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/nvic_setting.png)
 
 ### UART2
 
@@ -56,12 +60,10 @@
 
 ---
 
-## Key Functions
-
 ## User Code Sections
 
-The following sections in `main.c` contain all the **custom code added by the user** for Lab 2 functionality. These sections are delimited by CubeMX `/* USER CODE BEGIN */` and `/* USER CODE END */` comments.
-
+The following sections in [`main.c`](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/Lab2_blink_Chen/Core/Src/main.c) marked with `/* USER CODE BEGIN */` and `/* USER CODE END */` contain all custom code for this project (Lab2_Blinking_LED). These markers indicate where CubeMX-generated code ends and custom additions begin.
+ 
 ### 1. USER CODE BEGIN PV
 
 - **Purpose:** Declare global variables used in the program.  
@@ -193,12 +195,29 @@ uint32_t last_toggle = 0;        // Timestamp of last LED toggle
 
 ## Usage Instructions
 
-1. Connect the Nucleo board to your PC.  
-2. Open PuTTY: 115200 8N1, no flow control.  
-3. Power on the board. The terminal shows:
+1. Connect the Nucleo board to your PC
+2. Use device manger confrim com.
+   
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/com_confirm.png)
+3. Open PuTTY: 115200.
+   
+   ![PuTTY Setting](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/putty.png)
+4. Power on the board. The terminal shows:
+
+   Setting delay **1000ms**
+
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/video1.gif)
+
+   Setting delay **500ms**
+   
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/video2.gif)
+
+   Setting delay **100ms**
+   
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/video3.gif)
  
 ---
-## References
+
 
 ## References
 
