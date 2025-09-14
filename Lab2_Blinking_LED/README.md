@@ -69,44 +69,12 @@ The following sections in [`main.c`](https://github.com/Kuan0113/STM32_Project1/
 - **Purpose:** Declare global variables used in the program.  
 - **Added code:**
 ```c
-uint32_t blink_interval = 500;   // Default LED blink interval in ms
-uint32_t last_toggle = 0;        // Timestamp of last LED toggle
+uint32_t blink_delay = 1000;   // Default delay in ms
+uint32_t last_toggle = 0;        // Timestamp of last toggle
+uint8_t first_input_done = 0;    // Flag to track if initial delay is entered
 ```
 
-### 2. USER CODE BEGIN 0
-
-- **Purpose:** Define global helper functions and variables.  
-- **Added code:**
-  ```c
-  uint32_t blink_interval = 500;
-  uint32_t last_toggle = 0;
-
-  void UART_Transmit(char *message)
-  {
-      HAL_UART_Transmit(&huart2, (uint8_t*)message, strlen(message), HAL_MAX_DELAY);
-  }
-
-  uint32_t UART_ReadNumber(void)
-  {
-      char rx_buffer[10] = {0};
-      uint8_t index = 0;
-      uint8_t ch = 0;
-
-      while(1)
-      {
-          HAL_UART_Receive(&huart2, &ch, 1, HAL_MAX_DELAY);
-          if(ch == '\r') break;
-          if(index < sizeof(rx_buffer)-1)
-          {
-              rx_buffer[index++] = ch;
-              HAL_UART_Transmit(&huart2, &ch, 1, HAL_MAX_DELAY); // echo
-          }
-      }
-      rx_buffer[index] = '\0';
-      return atoi(rx_buffer);
-  }
-
-### 3. USER CODE BEGIN 2
+### 2. USER CODE BEGIN 2
 
 - **Purpose: Prompt the user for the initial LED interval at startup.**
 - **Added code:**
