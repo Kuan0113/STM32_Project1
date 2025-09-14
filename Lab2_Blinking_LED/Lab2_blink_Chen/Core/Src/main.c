@@ -259,7 +259,6 @@ void UART_Transmit(char *message)
     HAL_UART_Transmit(&huart2, (uint8_t*)message, strlen(message), HAL_MAX_DELAY);
 }
 
-
 uint32_t UART_ReadNumber(void)
 {
     char rx_buffer[10] = {0};
@@ -281,6 +280,7 @@ uint32_t UART_ReadNumber(void)
     uint32_t value = atoi(rx_buffer);
     return value; // Returns the integer entered by user
 }
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if(GPIO_Pin == B1_Pin)
