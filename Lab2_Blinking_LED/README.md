@@ -206,15 +206,15 @@ uint32_t last_toggle = 0;        // Timestamp of last LED toggle
 
    Setting delay **1000ms**
 
-   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/video1.gif)
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/1000ms.gif)
 
    Setting delay **500ms**
    
-   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/video2.gif)
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/500ms.gif)
 
    Setting delay **100ms**
    
-   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/video3.gif)
+   ![](https://github.com/Kuan0113/STM32_Project1/blob/main/Lab2_Blinking_LED/image/100ms.gif)
  
 ---
 
