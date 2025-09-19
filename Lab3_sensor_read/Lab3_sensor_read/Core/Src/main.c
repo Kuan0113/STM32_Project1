@@ -32,6 +32,26 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ISL29125_ADDR         (0x44 << 1)  // 7-bit address shifted for HAL
+
+// Register map
+#define ISL29125_REG_DEVICE_ID   0x00
+#define ISL29125_REG_CONFIG1     0x01
+#define ISL29125_REG_CONFIG2     0x02
+#define ISL29125_REG_CONFIG3     0x03
+#define ISL29125_REG_STATUS      0x08
+#define ISL29125_REG_GREEN_L     0x09
+#define ISL29125_REG_GREEN_H     0x0A
+#define ISL29125_REG_RED_L       0x0B
+#define ISL29125_REG_RED_H       0x0C
+#define ISL29125_REG_BLUE_L      0x0D
+#define ISL29125_REG_BLUE_H      0x0E
+
+// Config bits
+#define CONFIG1_MODE_RGB_16BIT   0x05   // RGB mode, 16-bit ADC, 375 lux
+#define CONFIG1_MODE_RGB_12BIT   0x0D   // RGB mode, 12-bit ADC, 375 lux
+#define CONFIG2_IR_MAX           0xBF   // Max IR compensation + IR offset
+#define CONFIG3_DEFAULT          0x00   // Default settings
 
 /* USER CODE END PD */
 
@@ -46,7 +66,8 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+char msg[64];
+uint16_t r, g, b;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,7 +76,10 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
-
+HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
+HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value);
+HAL_StatusTypeDef ISL29125_Init(void);
+HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -95,13 +119,19 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-
+  // Just initialize the sensor (no UART messages)
+  ISL29125_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (ISL29125_ReadRGB(&r, &g, &b) == HAL_OK) {
+	      int len = snprintf(msg, sizeof(msg), "R=%u G=%u B=%u\r\n", r, g, b);
+	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+	  }
+	  HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -281,6 +311,61 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value) {
+    uint8_t buf[2] = {reg, value};
+    return HAL_I2C_Master_Transmit(&hi2c1, ISL29125_ADDR, buf, 2, HAL_MAX_DELAY);
+}
+
+HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value) {
+    HAL_StatusTypeDef ret;
+    ret = HAL_I2C_Master_Transmit(&hi2c1, ISL29125_ADDR, &reg, 1, HAL_MAX_DELAY);
+    if (ret != HAL_OK) return ret;
+    return HAL_I2C_Master_Receive(&hi2c1, ISL29125_ADDR, value, 1, HAL_MAX_DELAY);
+}
+
+HAL_StatusTypeDef ISL29125_Init(void)
+{
+    HAL_StatusTypeDef ret;
+    uint8_t device_id;
+
+    // 1. Read device ID to verify sensor is connected
+    ret = ISL29125_ReadRegister(ISL29125_REG_DEVICE_ID, &device_id);
+    if (ret != HAL_OK) return ret;
+
+    // 2. Configure sensor for RGB mode, 16-bit ADC, 375 lux
+    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG1, CONFIG1_MODE_RGB_16BIT);
+    if (ret != HAL_OK) return ret;
+
+    // 3. Set IR compensation to max (recommended for high lux)
+    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG2, CONFIG2_IR_MAX);
+    if (ret != HAL_OK) return ret;
+
+    // 4. Set default CONFIG3 (no interrupts, default settings)
+    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG3, CONFIG3_DEFAULT);
+    if (ret != HAL_OK) return ret;
+
+    // Sensor initialized successfully
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b) {
+    uint8_t lo, hi;
+
+    ISL29125_ReadRegister(ISL29125_REG_GREEN_L, &lo);
+    ISL29125_ReadRegister(ISL29125_REG_GREEN_H, &hi);
+    *g = (hi << 8) | lo;
+
+    ISL29125_ReadRegister(ISL29125_REG_RED_L, &lo);
+    ISL29125_ReadRegister(ISL29125_REG_RED_H, &hi);
+    *r = (hi << 8) | lo;
+
+    ISL29125_ReadRegister(ISL29125_REG_BLUE_L, &lo);
+    ISL29125_ReadRegister(ISL29125_REG_BLUE_H, &hi);
+    *b = (hi << 8) | lo;
+
+    return HAL_OK;
+}
+
 
 /* USER CODE END 4 */
 
