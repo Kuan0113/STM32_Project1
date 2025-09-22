@@ -1,4 +1,4 @@
-../Core/Src/main.c:97:5:main	56	static
+../Core/Src/main.c:97:5:main	48	static
 ../Core/Src/main.c:154:6:SystemClock_Config	96	static
 ../Core/Src/main.c:204:13:MX_I2C1_Init	8	static
 ../Core/Src/main.c:252:13:MX_USART2_UART_Init	8	static
@@ -7,5 +7,5 @@
 ../Core/Src/main.c:327:19:ISL29125_ReadRegister	32	static
 ../Core/Src/main.c:334:19:ISL29125_Init	16	static
 ../Core/Src/main.c:359:19:ISL29125_ReadRGB	32	static
-../Core/Src/main.c:377:19:ISL29125_ReadRGBPercent	40	static
-../Core/Src/main.c:415:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:377:19:ISL29125_ReadRGBPercent	32	static
+../Core/Src/main.c:410:6:Error_Handler	4	static,ignoring_inline_asm

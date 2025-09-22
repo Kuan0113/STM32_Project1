@@ -68,7 +68,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 char msg[64];
 uint16_t r, g, b;
-float r_pct, g_pct, b_pct;
+int r_pct, g_pct, b_pct; // percentage RGB (integer)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -81,7 +81,7 @@ HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
 HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value);
 HAL_StatusTypeDef ISL29125_Init(void);
 HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b);
-HAL_StatusTypeDef ISL29125_ReadRGBPercent(float *r_perc, float *g_perc, float *b_perc);
+HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc);
 
 /* USER CODE END PFP */
 
@@ -136,7 +136,7 @@ int main(void)
 //	  }
 //	  HAL_Delay(500);
 	  if (ISL29125_ReadRGBPercent(&r_pct, &g_pct, &b_pct) == HAL_OK) {
-	      int len = snprintf(msg, sizeof(msg), "R=%.1f%% G=%.1f%% B=%.1f%%\r\n",r_pct, g_pct, b_pct);
+	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%% | RAW R=%u G=%u B=%u\r\n",r_pct, g_pct, b_pct, r, g, b);
 	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 	  }
 	  HAL_Delay(500);
@@ -374,10 +374,9 @@ HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b) {
     return HAL_OK;
 }
 
-HAL_StatusTypeDef ISL29125_ReadRGBPercent(float *r_perc, float *g_perc, float *b_perc)
-{
-    uint16_t r_raw, g_raw, b_raw;
+HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc) {
     uint8_t lo, hi;
+    uint16_t r_raw, g_raw, b_raw;
 
     // Read Green
     ISL29125_ReadRegister(ISL29125_REG_GREEN_L, &lo);
@@ -394,14 +393,10 @@ HAL_StatusTypeDef ISL29125_ReadRGBPercent(float *r_perc, float *g_perc, float *b
     ISL29125_ReadRegister(ISL29125_REG_BLUE_H, &hi);
     b_raw = (hi << 8) | lo;
 
-    // Calculate total
-    uint32_t sum = r_raw + g_raw + b_raw;
-    if (sum == 0) sum = 1; // prevent division by zero
-
-    // Convert to percentage
-    *r_perc = ((float)r_raw / sum) * 100.0f;
-    *g_perc = ((float)g_raw / sum) * 100.0f;
-    *b_perc = ((float)b_raw / sum) * 100.0f;
+    // Convert to percentage of sensor range (0–65535)
+    *r_perc = (r_raw * 100) / 65535;
+    *g_perc = (g_raw * 100) / 65535;
+    *b_perc = (b_raw * 100) / 65535;
 
     return HAL_OK;
 }
