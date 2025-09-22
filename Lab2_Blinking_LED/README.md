@@ -47,7 +47,7 @@
 ## Program Flow
 
 1. **Startup Prompt**  
-   - Program prints: `"Enter LED interval in ms:"`  
+   - Program prints: `"Enter LED delay in ms:"`  
    - User types a value and presses Enter to set the initial LED blink interval.  
 
 2. **Non-blocking LED Blink**  
@@ -55,7 +55,7 @@
    - Status is sent to UART: `"LED ON"` / `"LED OFF"`  
 
 3. **Update Interval via Button**  
-   - Pressing **B1** triggers: `"Enter new LED interval in ms:"`  
+   - Pressing **B1** triggers: `"Enter new LED delay in ms:"`  
    - User can enter a new value to update the blinking interval.  
 
 ---
