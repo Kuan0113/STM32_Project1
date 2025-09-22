@@ -503,6 +503,7 @@ int main(void)
  80005f0:	4908      	ldr	r1, [pc, #32]	@ (8000614 <main+0x78>)
  80005f2:	4809      	ldr	r0, [pc, #36]	@ (8000618 <main+0x7c>)
  80005f4:	f003 f84c 	bl	8003690 <HAL_UART_Transmit>
+
 	  }
 	  HAL_Delay(500);
  80005f8:	f44f 70fa 	mov.w	r0, #500	@ 0x1f4
