@@ -122,7 +122,6 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  // Just initialize the sensor (no UART messages)
   ISL29125_Init();
   /* USER CODE END 2 */
 
@@ -335,23 +334,23 @@ HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value) {
 HAL_StatusTypeDef ISL29125_Init(void)
 {
     HAL_StatusTypeDef ret;
-    uint8_t device_id;
+//    uint8_t device_id;
 
-    // 1. Read device ID to verify sensor is connected
-    ret = ISL29125_ReadRegister(ISL29125_REG_DEVICE_ID, &device_id);
-    if (ret != HAL_OK) return ret;
+//    // 1. Read device ID to verify sensor is connected
+//    ret = ISL29125_ReadRegister(ISL29125_REG_DEVICE_ID, &device_id);
+//    if (ret != HAL_OK) return ret;
 
     // 2. Configure sensor for RGB mode, 16-bit ADC, 375 lux
     ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG1, CONFIG1_MODE_RGB_16BIT);
     if (ret != HAL_OK) return ret;
 
-    // 3. Set IR compensation to max (recommended for high lux)
-    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG2, CONFIG2_IR_MAX);
-    if (ret != HAL_OK) return ret;
-
-    // 4. Set default CONFIG3 (no interrupts, default settings)
-    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG3, CONFIG3_DEFAULT);
-    if (ret != HAL_OK) return ret;
+//    // 3. Set IR compensation to max (recommended for high lux)
+//    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG2, CONFIG2_IR_MAX);
+//    if (ret != HAL_OK) return ret;
+//
+//    // 4. Set default CONFIG3 (no interrupts, default settings)
+//    ret = ISL29125_WriteRegister(ISL29125_REG_CONFIG3, CONFIG3_DEFAULT);
+//    if (ret != HAL_OK) return ret;
 
     // Sensor initialized successfully
     return HAL_OK;
