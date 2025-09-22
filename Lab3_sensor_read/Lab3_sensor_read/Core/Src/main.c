@@ -138,6 +138,7 @@ int main(void)
 	  if (ISL29125_ReadRGBPercent(&r_pct, &g_pct, &b_pct) == HAL_OK) {
 	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%%\r\n",r_pct, g_pct, b_pct);
 	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+
 	  }
 	  HAL_Delay(500);
     /* USER CODE END WHILE */
