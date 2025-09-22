@@ -68,6 +68,7 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 char msg[64];
 uint16_t r, g, b;
+float r_pct, g_pct, b_pct;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,6 +81,8 @@ HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
 HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value);
 HAL_StatusTypeDef ISL29125_Init(void);
 HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b);
+HAL_StatusTypeDef ISL29125_ReadRGBPercent(float *r_perc, float *g_perc, float *b_perc);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -127,8 +130,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if (ISL29125_ReadRGB(&r, &g, &b) == HAL_OK) {
-	      int len = snprintf(msg, sizeof(msg), "R=%u G=%u B=%u\r\n", r, g, b);
+//	  if (ISL29125_ReadRGB(&r, &g, &b) == HAL_OK) {
+//	      int len = snprintf(msg, sizeof(msg), "R=%u G=%u B=%u\r\n", r, g, b);
+//	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+//	  }
+//	  HAL_Delay(500);
+	  if (ISL29125_ReadRGBPercent(&r_pct, &g_pct, &b_pct) == HAL_OK) {
+	      int len = snprintf(msg, sizeof(msg), "R=%.1f%% G=%.1f%% B=%.1f%%\r\n",r_pct, g_pct, b_pct);
 	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 	  }
 	  HAL_Delay(500);
@@ -366,6 +374,37 @@ HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b) {
     return HAL_OK;
 }
 
+HAL_StatusTypeDef ISL29125_ReadRGBPercent(float *r_perc, float *g_perc, float *b_perc)
+{
+    uint16_t r_raw, g_raw, b_raw;
+    uint8_t lo, hi;
+
+    // Read Green
+    ISL29125_ReadRegister(ISL29125_REG_GREEN_L, &lo);
+    ISL29125_ReadRegister(ISL29125_REG_GREEN_H, &hi);
+    g_raw = (hi << 8) | lo;
+
+    // Read Red
+    ISL29125_ReadRegister(ISL29125_REG_RED_L, &lo);
+    ISL29125_ReadRegister(ISL29125_REG_RED_H, &hi);
+    r_raw = (hi << 8) | lo;
+
+    // Read Blue
+    ISL29125_ReadRegister(ISL29125_REG_BLUE_L, &lo);
+    ISL29125_ReadRegister(ISL29125_REG_BLUE_H, &hi);
+    b_raw = (hi << 8) | lo;
+
+    // Calculate total
+    uint32_t sum = r_raw + g_raw + b_raw;
+    if (sum == 0) sum = 1; // prevent division by zero
+
+    // Convert to percentage
+    *r_perc = ((float)r_raw / sum) * 100.0f;
+    *g_perc = ((float)g_raw / sum) * 100.0f;
+    *b_perc = ((float)b_raw / sum) * 100.0f;
+
+    return HAL_OK;
+}
 
 /* USER CODE END 4 */
 
