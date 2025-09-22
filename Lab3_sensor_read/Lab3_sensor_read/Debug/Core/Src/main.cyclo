@@ -6,6 +6,5 @@
 ../Core/Src/main.c:322:19:ISL29125_WriteRegister	1
 ../Core/Src/main.c:327:19:ISL29125_ReadRegister	2
 ../Core/Src/main.c:334:19:ISL29125_Init	5
-../Core/Src/main.c:359:19:ISL29125_ReadRGB	1
 ../Core/Src/main.c:377:19:ISL29125_ReadRGBPercent	1
 ../Core/Src/main.c:410:6:Error_Handler	1

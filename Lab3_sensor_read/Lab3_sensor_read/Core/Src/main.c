@@ -67,7 +67,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 char msg[64];
-uint16_t r, g, b;
+//uint16_t r, g, b;
 int r_pct, g_pct, b_pct; // percentage RGB (integer)
 /* USER CODE END PV */
 
@@ -136,7 +136,7 @@ int main(void)
 //	  }
 //	  HAL_Delay(500);
 	  if (ISL29125_ReadRGBPercent(&r_pct, &g_pct, &b_pct) == HAL_OK) {
-	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%% | RAW R=%u G=%u B=%u\r\n",r_pct, g_pct, b_pct, r, g, b);
+	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%%\r\n",r_pct, g_pct, b_pct);
 	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 	  }
 	  HAL_Delay(500);
@@ -356,23 +356,23 @@ HAL_StatusTypeDef ISL29125_Init(void)
     return HAL_OK;
 }
 
-HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b) {
-    uint8_t lo, hi;
-
-    ISL29125_ReadRegister(ISL29125_REG_GREEN_L, &lo);
-    ISL29125_ReadRegister(ISL29125_REG_GREEN_H, &hi);
-    *g = (hi << 8) | lo;
-
-    ISL29125_ReadRegister(ISL29125_REG_RED_L, &lo);
-    ISL29125_ReadRegister(ISL29125_REG_RED_H, &hi);
-    *r = (hi << 8) | lo;
-
-    ISL29125_ReadRegister(ISL29125_REG_BLUE_L, &lo);
-    ISL29125_ReadRegister(ISL29125_REG_BLUE_H, &hi);
-    *b = (hi << 8) | lo;
-
-    return HAL_OK;
-}
+//HAL_StatusTypeDef ISL29125_ReadRGB(uint16_t *r, uint16_t *g, uint16_t *b) {
+//    uint8_t lo, hi;
+//
+//    ISL29125_ReadRegister(ISL29125_REG_GREEN_L, &lo);
+//    ISL29125_ReadRegister(ISL29125_REG_GREEN_H, &hi);
+//    *g = (hi << 8) | lo;
+//
+//    ISL29125_ReadRegister(ISL29125_REG_RED_L, &lo);
+//    ISL29125_ReadRegister(ISL29125_REG_RED_H, &hi);
+//    *r = (hi << 8) | lo;
+//
+//    ISL29125_ReadRegister(ISL29125_REG_BLUE_L, &lo);
+//    ISL29125_ReadRegister(ISL29125_REG_BLUE_H, &hi);
+//    *b = (hi << 8) | lo;
+//
+//    return HAL_OK;
+//}
 
 HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc) {
     uint8_t lo, hi;
