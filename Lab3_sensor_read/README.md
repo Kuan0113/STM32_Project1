@@ -1,1 +1,2 @@
-https://www.micropeta.com/video114
+Lab 3 Sensor Readout - Baremetal & RTOS Task
+
