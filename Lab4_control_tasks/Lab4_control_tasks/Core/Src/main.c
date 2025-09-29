@@ -73,6 +73,13 @@ const osThreadAttr_t ReadRGB_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for ControlLogicTas */
+osThreadId_t ControlLogicTasHandle;
+const osThreadAttr_t ControlLogicTas_attributes = {
+  .name = "ControlLogicTas",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
 char msg[64];
 int r, g, b; // percentage RGB (integer)
@@ -84,6 +91,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 void StartReadRGB(void *argument);
+void StartControlLogicTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
@@ -155,6 +163,9 @@ int main(void)
   /* Create the thread(s) */
   /* creation of ReadRGB */
   ReadRGBHandle = osThreadNew(StartReadRGB, NULL, &ReadRGB_attributes);
+
+  /* creation of ControlLogicTas */
+  ControlLogicTasHandle = osThreadNew(StartControlLogicTask, NULL, &ControlLogicTas_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -338,10 +349,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Out_LED_GPIO_Port, Out_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|Out_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -349,19 +357,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin Out_LED_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin|Out_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Out_LED_Pin */
-  GPIO_InitStruct.Pin = Out_LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(Out_LED_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -446,6 +447,24 @@ void StartReadRGB(void *argument)
 
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartControlLogicTask */
+/**
+* @brief Function implementing the ControlLogicTas thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartControlLogicTask */
+void StartControlLogicTask(void *argument)
+{
+  /* USER CODE BEGIN StartControlLogicTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartControlLogicTask */
 }
 
 /**
