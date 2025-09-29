@@ -28,6 +28,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct {
+    int r;
+    int g;
+    int b;
+} RGBData_t;
 
 /* USER CODE END PTD */
 
@@ -82,7 +87,8 @@ const osThreadAttr_t ControlLogicTas_attributes = {
 };
 /* USER CODE BEGIN PV */
 char msg[64];
-int r, g, b; // percentage RGB (integer)
+RGBData_t rgbData;  // Global instance for latest values
+osMessageQueueId_t rgbQueueHandle;  // Queue handle
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,6 +104,8 @@ HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
 HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value);
 HAL_StatusTypeDef ISL29125_Init(void);
 HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc);
+void Actuator_SetLED(uint8_t state);
+void Queue_Init(void);
 
 /* USER CODE END PFP */
 
@@ -139,6 +147,7 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   ISL29125_Init();
+  Queue_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -422,6 +431,19 @@ HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc)
 
     return HAL_OK;
 }
+void Actuator_SetLED(uint8_t state) {
+    HAL_GPIO_WritePin(GPIOA, Out_LED_Pin,
+                      state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void Queue_Init(void) {
+    rgbQueueHandle = osMessageQueueNew(4, sizeof(RGBData_t), NULL);
+    if (rgbQueueHandle == NULL) {
+        snprintf(msg, sizeof(msg), "Queue creation failed!\r\n");
+        HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+        Error_Handler();
+    }
+}
 
 /* USER CODE END 4 */
 
@@ -436,16 +458,20 @@ void StartReadRGB(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-  for(;;)
-  {
+	for(;;)
+	{
+	    if (ISL29125_ReadRGBPercent(&rgbData.r, &rgbData.g, &rgbData.b) == HAL_OK) {
+	        int len = snprintf(msg, sizeof(msg),
+	                           "R=%d%% G=%d%% B=%d%%\r\n",
+	                           rgbData.r, rgbData.g, rgbData.b);
+	        HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 
-      if (ISL29125_ReadRGBPercent(&r, &g, &b) == HAL_OK) {
-          int len = snprintf(msg, sizeof(msg), "R=%d%% G=%d%% B=%d%%\r\n", r, g, b);
-          HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-      }
-      osDelay(500);
+	        // Send to queue (overwrite if full)
+	        osMessageQueuePut(rgbQueueHandle, &rgbData, 0, 0);
+	    }
+	    osDelay(500);
+	}
 
-  }
   /* USER CODE END 5 */
 }
 
@@ -460,10 +486,21 @@ void StartControlLogicTask(void *argument)
 {
   /* USER CODE BEGIN StartControlLogicTask */
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	for(;;)
+	{
+	    RGBData_t sample;
+	    if (osMessageQueueGet(rgbQueueHandle, &sample, NULL, osWaitForever) == osOK) {
+	        // Simple red detection logic
+	        if ((sample.r > 99) && (sample.g > 99) && (sample.b > 99)) {
+	            Actuator_SetLED(1);
+	            snprintf(msg, sizeof(msg), "Trigger: White detected\r\n");
+	            HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	        } else {
+	            Actuator_SetLED(0);
+	        }
+	    }
+	}
+
   /* USER CODE END StartControlLogicTask */
 }
 
