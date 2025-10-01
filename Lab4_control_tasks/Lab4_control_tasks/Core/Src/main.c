@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -78,10 +79,10 @@ const osThreadAttr_t ReadRGB_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for ControlLogicTas */
-osThreadId_t ControlLogicTasHandle;
-const osThreadAttr_t ControlLogicTas_attributes = {
-  .name = "ControlLogicTas",
+/* Definitions for ControlTask */
+osThreadId_t ControlTaskHandle;
+const osThreadAttr_t ControlTask_attributes = {
+  .name = "ControlTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
@@ -96,7 +97,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 void StartReadRGB(void *argument);
-void StartControlLogicTask(void *argument);
+void StartControlTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
@@ -110,7 +111,17 @@ void Actuator_SetLED(uint8_t state);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void traceTaskSwitch(void)
+{
+    uint8_t buf1[50];
 
+    HAL_GPIO_TogglePin(GPIOA, LD2_Pin);
+
+    // Print the current task name to UART
+    snprintf((char*)buf1, sizeof(buf1),
+             "Current task: %s\r\n", pcTaskGetName(NULL));
+    HAL_UART_Transmit(&huart2, buf1, strlen((char*)buf1), HAL_MAX_DELAY);
+}
 /* USER CODE END 0 */
 
 /**
@@ -172,8 +183,8 @@ int main(void)
   /* creation of ReadRGB */
   ReadRGBHandle = osThreadNew(StartReadRGB, NULL, &ReadRGB_attributes);
 
-  /* creation of ControlLogicTas */
-  ControlLogicTasHandle = osThreadNew(StartControlLogicTask, NULL, &ControlLogicTas_attributes);
+  /* creation of ControlTask */
+  ControlTaskHandle = osThreadNew(StartControlTask, NULL, &ControlTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -464,19 +475,19 @@ void StartReadRGB(void *argument)
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartControlLogicTask */
+/* USER CODE BEGIN Header_StartControlTask */
 /**
-* @brief Function implementing the ControlLogicTas thread.
+* @brief Function implementing the ControlTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartControlLogicTask */
-void StartControlLogicTask(void *argument)
+/* USER CODE END Header_StartControlTask */
+void StartControlTask(void *argument)
 {
-  /* USER CODE BEGIN StartControlLogicTask */
+  /* USER CODE BEGIN StartControlTask */
   /* Infinite loop */
-	for(;;)
-	{
+  for(;;)
+  {
 	    // Read the global variable into a local variable for processing
 	    RGBData_t sample_local = rgbData;
 	    uint8_t state = 0; // 0 for no trigger, 1 for trigger
@@ -488,9 +499,8 @@ void StartControlLogicTask(void *argument)
 	    }
 
 	    Actuator_SetLED(state); // Take action based on the trigger state
-	}
-
-  /* USER CODE END StartControlLogicTask */
+  }
+  /* USER CODE END StartControlTask */
 }
 
 /**
