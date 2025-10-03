@@ -96,6 +96,7 @@ HAL_StatusTypeDef ISL29125_Init(void);
 HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val);
 void Actuator_SetLED(uint8_t state);
 const char* DetectColor(int r, int g, int b);
+void traceTaskSwitch(void) {}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
