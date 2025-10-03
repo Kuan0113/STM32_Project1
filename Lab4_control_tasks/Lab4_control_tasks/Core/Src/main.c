@@ -86,6 +86,13 @@ const osThreadAttr_t ControlTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for ActuatorTask */
+osThreadId_t ActuatorTaskHandle;
+const osThreadAttr_t ActuatorTask_attributes = {
+  .name = "ActuatorTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
 char msg[64];
 RGBData_t rgbData;  // Global instance for latest values
@@ -98,6 +105,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 void StartReadRGB(void *argument);
 void StartControlTask(void *argument);
+void StartActuatorTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
@@ -185,6 +193,9 @@ int main(void)
 
   /* creation of ControlTask */
   ControlTaskHandle = osThreadNew(StartControlTask, NULL, &ControlTask_attributes);
+
+  /* creation of ActuatorTask */
+  ActuatorTaskHandle = osThreadNew(StartActuatorTask, NULL, &ActuatorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -501,6 +512,24 @@ void StartControlTask(void *argument)
 	    Actuator_SetLED(state); // Take action based on the trigger state
   }
   /* USER CODE END StartControlTask */
+}
+
+/* USER CODE BEGIN Header_StartActuatorTask */
+/**
+* @brief Function implementing the ActuatorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartActuatorTask */
+void StartActuatorTask(void *argument)
+{
+  /* USER CODE BEGIN StartActuatorTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartActuatorTask */
 }
 
 /**
