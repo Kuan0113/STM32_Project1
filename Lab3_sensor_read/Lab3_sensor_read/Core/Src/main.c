@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -66,23 +65,9 @@ I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart2;
 
-/* Definitions for ReadRGB */
-osThreadId_t ReadRGBHandle;
-const osThreadAttr_t ReadRGB_attributes = {
-  .name = "ReadRGB",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for ControlLogicTas */
-osThreadId_t ControlLogicTasHandle;
-const osThreadAttr_t ControlLogicTas_attributes = {
-  .name = "ControlLogicTas",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
 /* USER CODE BEGIN PV */
 char msg[64];
-int r, g, b; // percentage RGB (integer)
+int r, g, b;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,15 +75,12 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
-void StartReadRGB(void *argument);
-void StartControlLogicTask(void *argument);
-
 /* USER CODE BEGIN PFP */
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
 HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value);
 HAL_StatusTypeDef ISL29125_Init(void);
-HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc);
-
+HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val);
+const char* DetectColor(int r, int g, int b);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -141,56 +123,18 @@ int main(void)
   ISL29125_Init();
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();
-
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
-
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
-
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* creation of ReadRGB */
-  ReadRGBHandle = osThreadNew(StartReadRGB, NULL, &ReadRGB_attributes);
-
-  /* creation of ControlLogicTas */
-  ControlLogicTasHandle = osThreadNew(StartControlLogicTask, NULL, &ControlLogicTas_attributes);
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
-
-  /* Start scheduler */
-  osKernelStart();
-
-  /* We should never get here as control is now taken by the scheduler */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
 
-//	  if (ISL29125_ReadRGBPercent(&r_pct, &g_pct, &b_pct) == HAL_OK) {
-//	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%%\r\n",r_pct, g_pct, b_pct);
-//	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-//
-//	  }
-//	  HAL_Delay(500);
+	  if (ISL29125_ReadRGB255(&r, &g, &b) == HAL_OK) {
+		  const char* color = DetectColor(r, g, b);
+		  int len = snprintf(msg, sizeof(msg), "R=%d G=%d B=%d => %s\r\n", r, g, b, color);
+	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+
+	  }
+	  HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -349,7 +293,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|Out_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -357,12 +301,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin Out_LED_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|Out_LED_Pin;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -396,7 +340,7 @@ HAL_StatusTypeDef ISL29125_Init(void)
 }
 
 
-HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc) {
+HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val) {
     uint8_t lo, hi;
     uint16_t r_raw, g_raw, b_raw;
 
@@ -416,78 +360,39 @@ HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc)
     b_raw = (hi << 8) | lo;
 
     // Convert to percentage of sensor range (0–65535)
-    *r_perc = (r_raw * 100) / 65535;
-    *g_perc = (g_raw * 100) / 65535;
-    *b_perc = (b_raw * 100) / 65535;
+    *r_val = (r_raw * 255) / 65535;
+    *g_val = (g_raw * 255) / 65535;
+    *b_val = (b_raw * 255) / 65535;
 
     return HAL_OK;
 }
+const char* DetectColor(int r, int g, int b) {
+    // --- BLACK detection ---
+    if (r < 60 && g < 100 && 50 < b && b < 80) return "BLACK";
 
+    // --- YELLOW detection ---
+    if (r > 240 && g > 240 && b > 190) return "YELLOW";
+
+    // --- RED detection ---
+    if (r > 145 && g > 145) {
+        if (g - b > 60) return "RED";
+    }
+
+    // --- GREEN (Dark/Light) detection ---
+    if (g > 250) {
+        if (g > r + 70 && g > b + 70) return "GREEN";
+        if (r > 150 && b > 150) return "GREEN";
+    }
+
+    // --- BLUE (Dark/Light) detection ---
+    if (g > 170 && b > 170 && r < 100) {
+        if (b > r + 90) return "BLUE";
+    }
+
+    // Fallback if nothing matches cleanly
+    return "UNKNOWN";
+}
 /* USER CODE END 4 */
-
-/* USER CODE BEGIN Header_StartReadRGB */
-/**
-* @brief Function implementing the ReadRGB thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartReadRGB */
-void StartReadRGB(void *argument)
-{
-  /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-
-      if (ISL29125_ReadRGBPercent(&r, &g, &b) == HAL_OK) {
-          int len = snprintf(msg, sizeof(msg), "R=%d%% G=%d%% B=%d%%\r\n", r, g, b);
-          HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-      }
-      osDelay(500);
-
-  }
-  /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_StartControlLogicTask */
-/**
-* @brief Function implementing the ControlLogicTas thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartControlLogicTask */
-void StartControlLogicTask(void *argument)
-{
-  /* USER CODE BEGIN StartControlLogicTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartControlLogicTask */
-}
-
-/**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM6 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  /* USER CODE BEGIN Callback 0 */
-
-  /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM6)
-  {
-    HAL_IncTick();
-  }
-  /* USER CODE BEGIN Callback 1 */
-
-  /* USER CODE END Callback 1 */
-}
 
 /**
   * @brief  This function is executed in case of error occurrence.
