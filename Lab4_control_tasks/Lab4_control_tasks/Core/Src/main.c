@@ -29,11 +29,6 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef struct {
-    int r;
-    int g;
-    int b;
-} RGBData_t;
 
 /* USER CODE END PTD */
 
@@ -88,7 +83,8 @@ const osThreadAttr_t ControlTask_attributes = {
 };
 /* USER CODE BEGIN PV */
 char msg[64];
-RGBData_t rgbData;  // Global instance for latest values
+char detectedColor[16];   // Shared string between tasks
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,8 +99,9 @@ void StartControlTask(void *argument);
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
 HAL_StatusTypeDef ISL29125_ReadRegister(uint8_t reg, uint8_t *value);
 HAL_StatusTypeDef ISL29125_Init(void);
-HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc);
+HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val);
 void Actuator_SetLED(uint8_t state);
+const char* DetectColor(int r, int g, int b);
 //void Queue_Init(void);
 
 /* USER CODE END PFP */
@@ -204,7 +201,7 @@ int main(void)
   while (1)
   {
 
-//	  if (ISL29125_ReadRGBPercent(&r_pct, &g_pct, &b_pct) == HAL_OK) {
+//	  if (ISL29125_ReadRGB255(&r_pct, &g_pct, &b_pct) == HAL_OK) {
 //	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%%\r\n",r_pct, g_pct, b_pct);
 //	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 //
@@ -415,7 +412,7 @@ HAL_StatusTypeDef ISL29125_Init(void)
 }
 
 
-HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc) {
+HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val) {
     uint8_t lo, hi;
     uint16_t r_raw, g_raw, b_raw;
 
@@ -435,15 +432,41 @@ HAL_StatusTypeDef ISL29125_ReadRGBPercent(int *r_perc, int *g_perc, int *b_perc)
     b_raw = (hi << 8) | lo;
 
     // Convert to percentage of sensor range (0–65535)
-    *r_perc = (r_raw * 100) / 65535;
-    *g_perc = (g_raw * 100) / 65535;
-    *b_perc = (b_raw * 100) / 65535;
+    *r_val = (r_raw * 255) / 65535;
+    *g_val = (g_raw * 255) / 65535;
+    *b_val = (b_raw * 255) / 65535;
 
     return HAL_OK;
 }
 void Actuator_SetLED(uint8_t state) {
     HAL_GPIO_WritePin(GPIOA, Out_LED_Pin,
                       state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+const char* DetectColor(int r, int g, int b) {
+    // --- BLACK detection ---
+    if (r < 60 && g < 100 && 50 < b && b < 80) return "BLACK";
+
+    // --- YELLOW detection ---
+    if (r > 240 && g > 240 && b > 190) return "YELLOW";
+
+    // --- RED detection ---
+    if (r > 145 && g > 145) {
+        if (g - b > 60) return "RED";
+    }
+
+    // --- GREEN (Dark/Light) detection ---
+    if (g > 250) {
+        if (g > r + 70 && g > b + 70) return "GREEN";
+        if (r > 150 && b > 150) return "GREEN";
+    }
+
+    // --- BLUE (Dark/Light) detection ---
+    if (g > 170 && b > 170 && r < 100) {
+        if (b > r + 90) return "BLUE";
+    }
+
+    // Fallback if nothing matches cleanly
+    return "UNKNOWN";
 }
 
 /* USER CODE END 4 */
@@ -461,16 +484,24 @@ void StartReadRGB(void *argument)
   /* Infinite loop */
 	for(;;)
 	{
-	    if (ISL29125_ReadRGBPercent(&rgbData.r, &rgbData.g, &rgbData.b) == HAL_OK) {
-	        int len = snprintf(msg, sizeof(msg),
-	                           "R=%d%% G=%d%% B=%d%%\r\n",
-	                           rgbData.r, rgbData.g, rgbData.b);
-	        HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+        int r, g, b;
 
+        if (ISL29125_ReadRGB255(&r, &g, &b) == HAL_OK) {
+            const char* color = DetectColor(r, g, b);
 
-	    }
-	    osDelay(500);
-	}
+            // Save detected color string globally (for ControlTask)
+            strncpy(detectedColor, color, sizeof(detectedColor)-1);
+            detectedColor[sizeof(detectedColor)-1] = '\0';
+
+            // Print RGB + Detected color
+            int len = snprintf(msg, sizeof(msg),
+                               "R=%d G=%d B=%d | Detected: %s\r\n",
+                               r, g, b, color);
+
+            HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+        }
+        osDelay(500);
+    }
 
   /* USER CODE END 5 */
 }
@@ -488,17 +519,27 @@ void StartControlTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	    // Read the global variable into a local variable for processing
-	    RGBData_t sample_local = rgbData;
-	    uint8_t state = 0; // 0 for no trigger, 1 for trigger
+      uint8_t state = 0;
 
-	    if ((sample_local.r > 99) && (sample_local.g > 99) && (sample_local.b > 99)) {
-	        state = 1; // Trigger
-	    } else {
-	        state = 0; // No trigger
-	    }
+      // Make a local copy of the detected color (thread safety)
+      char color_local[16];
+      strncpy(color_local, detectedColor, sizeof(color_local));
+      color_local[sizeof(color_local)-1] = '\0';
 
-	    Actuator_SetLED(state); // Take action based on the trigger state
+      // Decide based on color
+      if (strcmp(color_local, "GREEN") == 0) {
+          state = 1; // turn LED ON
+      }
+      else if (strcmp(color_local, "YELLOW") == 0) {
+          state = 1; // also turn LED ON
+      }
+      else {
+          state = 0; // LED OFF otherwise
+      }
+
+      Actuator_SetLED(state);
+
+      osDelay(200);
   }
   /* USER CODE END StartControlTask */
 }
