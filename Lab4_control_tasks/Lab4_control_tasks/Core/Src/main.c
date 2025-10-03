@@ -96,6 +96,7 @@ const osThreadAttr_t ActuatorTask_attributes = {
 /* USER CODE BEGIN PV */
 char msg[64];
 RGBData_t rgbData;  // Global instance for latest values
+osMessageQueueId_t ActuatorQueueHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
