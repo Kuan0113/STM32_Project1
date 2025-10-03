@@ -166,7 +166,7 @@ standard names. */
 #define USE_CUSTOM_SYSTICK_HANDLER_IMPLEMENTATION 0
 
 /* USER CODE BEGIN Defines */
-#define traceTASK_SWITCHED_IN() traceTaskSwitch()
+
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

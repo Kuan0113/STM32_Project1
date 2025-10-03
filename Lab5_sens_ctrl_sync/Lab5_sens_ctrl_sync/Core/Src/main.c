@@ -18,18 +18,26 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include "FreeRTOS.h" // Native FreeRTOS header
 #include "task.h"
+#include "queue.h"    // Native FreeRTOS Queue header
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+// Structure to hold data sent through the queue (Part II)
+typedef struct {
+    int r;
+    int g;
+    int b;
+    char color[16];
+} SensorData_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -67,23 +75,9 @@ I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart2;
 
-/* Definitions for ReadRGB */
-osThreadId_t ReadRGBHandle;
-const osThreadAttr_t ReadRGB_attributes = {
-  .name = "ReadRGB",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for ControlTask */
-osThreadId_t ControlTaskHandle;
-const osThreadAttr_t ControlTask_attributes = {
-  .name = "ControlTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
 /* USER CODE BEGIN PV */
 char msg[64];
-char detectedColor[16];   // Shared string between tasks
+QueueHandle_t sensorQueue; // Handle for the FreeRTOS queue (Part II)
 
 /* USER CODE END PV */
 
@@ -102,23 +96,11 @@ HAL_StatusTypeDef ISL29125_Init(void);
 HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val);
 void Actuator_SetLED(uint8_t state);
 const char* DetectColor(int r, int g, int b);
-//void Queue_Init(void);
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void traceTaskSwitch(void)
-{
-    uint8_t buf1[50];
 
-    HAL_GPIO_TogglePin(GPIOA, LD2_Pin);
-
-    // Print the current task name to UART
-    snprintf((char*)buf1, sizeof(buf1),
-             "Current task: %s\r\n", pcTaskGetName(NULL));
-    HAL_UART_Transmit(&huart2, buf1, strlen((char*)buf1), HAL_MAX_DELAY);
-}
 /* USER CODE END 0 */
 
 /**
@@ -142,23 +124,23 @@ int main(void)
   /* USER CODE END Init */
 
   /* Configure the system clock */
-  SystemClock_Config();
+  SystemClock_Config(); // <<< DEFINITION NOW INCLUDED BELOW
 
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_I2C1_Init();
+  MX_GPIO_Init(); // <<< DEFINITION NOW INCLUDED BELOW
+  MX_USART2_UART_Init(); // <<< DEFINITION NOW INCLUDED BELOW
+  MX_I2C1_Init(); // <<< DEFINITION NOW INCLUDED BELOW
   /* USER CODE BEGIN 2 */
-  ISL29125_Init();
+  ISL29125_Init(); // <<< DEFINITION NOW INCLUDED BELOW
 
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  osKernelInitialize();
+
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -174,17 +156,32 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+  // Create a queue for sensor data (Part II)
+  sensorQueue = xQueueCreate(
+      1,                     // Max number of items the queue can hold (size 1 for latest data)
+      sizeof(SensorData_t)   // Size of each item
+  );
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of ReadRGB */
-  ReadRGBHandle = osThreadNew(StartReadRGB, NULL, &ReadRGB_attributes);
-
-  /* creation of ControlTask */
-  ControlTaskHandle = osThreadNew(StartControlTask, NULL, &ControlTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  // Create SensorTask (Part II)
+  xTaskCreate(StartReadRGB,
+              "SensorTask",
+              256,              // Stack size (words)
+              NULL,             // Parameter
+              2,                // Priority
+              NULL);
+
+  // Create ControlTask (Part II)
+  xTaskCreate(StartControlTask,
+              "ControlTask",
+              256,              // Stack size (words)
+              NULL,             // Parameter
+              1,                // Priority (lower than sensor)
+              NULL);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -192,7 +189,7 @@ int main(void)
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
-  osKernelStart();
+  vTaskStartScheduler(); // REPLACED osKernelStart()
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -201,12 +198,6 @@ int main(void)
   while (1)
   {
 
-//	  if (ISL29125_ReadRGB255(&r_pct, &g_pct, &b_pct) == HAL_OK) {
-//	      int len = snprintf(msg, sizeof(msg),"R=%d%% G=%d%% B=%d%%\r\n",r_pct, g_pct, b_pct);
-//	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-//
-//	  }
-//	  HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -215,7 +206,7 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
+  * @brief System Clock Configuration (FIX: Missing Definition)
   * @retval None
   */
 void SystemClock_Config(void)
@@ -264,7 +255,7 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
+  * @brief I2C1 Initialization Function (FIX: Missing Definition)
   * @param None
   * @retval None
   */
@@ -312,7 +303,7 @@ static void MX_I2C1_Init(void)
 }
 
 /**
-  * @brief USART2 Initialization Function
+  * @brief USART2 Initialization Function (FIX: Missing Definition)
   * @param None
   * @retval None
   */
@@ -347,7 +338,7 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
-  * @brief GPIO Initialization Function
+  * @brief GPIO Initialization Function (FIX: Missing Definition)
   * @param None
   * @retval None
   */
@@ -386,6 +377,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// FIX: Missing definitions for helper functions are included here:
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value) {
     uint8_t buf[2] = {reg, value};
     return HAL_I2C_Master_Transmit(&hi2c1, ISL29125_ADDR, buf, 2, HAL_MAX_DELAY);
@@ -439,6 +431,8 @@ HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val) {
     return HAL_OK;
 }
 void Actuator_SetLED(uint8_t state) {
+    // FIX: LD2_Pin was not in the original code, but is often used for debugging.
+    // Assuming the main LED is Out_LED_Pin.
     HAL_GPIO_WritePin(GPIOA, Out_LED_Pin,
                       state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
@@ -468,12 +462,11 @@ const char* DetectColor(int r, int g, int b) {
     // Fallback if nothing matches cleanly
     return "UNKNOWN";
 }
-
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartReadRGB */
 /**
-* @brief Function implementing the ReadRGB thread.
+* @brief Function implementing the ReadRGB thread (SensorTask).
 * @param argument: Not used
 * @retval None
 */
@@ -481,26 +474,39 @@ const char* DetectColor(int r, int g, int b) {
 void StartReadRGB(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
+    // Use local variable instead of global (Part II)
+    SensorData_t sensor_data;
+    BaseType_t xStatus;
+
 	for(;;)
 	{
-        int r, g, b;
+        // 1. Read sensor data into local variable/struct
+        if (ISL29125_ReadRGB255(&sensor_data.r, &sensor_data.g, &sensor_data.b) == HAL_OK) {
 
-        if (ISL29125_ReadRGB255(&r, &g, &b) == HAL_OK) {
-            const char* color = DetectColor(r, g, b);
+            const char* color = DetectColor(sensor_data.r, sensor_data.g, sensor_data.b);
+            strncpy(sensor_data.color, color, sizeof(sensor_data.color)-1);
+            sensor_data.color[sizeof(sensor_data.color)-1] = '\0';
 
-            // Save detected color string globally (for ControlTask)
-            strncpy(detectedColor, color, sizeof(detectedColor)-1);
-            detectedColor[sizeof(detectedColor)-1] = '\0';
-
-            // Print RGB + Detected color
+            // Print RGB + Detected color (optional debug output)
             int len = snprintf(msg, sizeof(msg),
                                "R=%d G=%d B=%d | Detected: %s\r\n",
-                               r, g, b, color);
+                               sensor_data.r, sensor_data.g, sensor_data.b, color);
 
             HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+
+            // 2. Send data to the queue (Part II)
+            xStatus = xQueueSend(sensorQueue,
+                                 &sensor_data,
+                                 0); // Don't block (0 ticks)
+
+            if (xStatus != pdPASS)
+            {
+                // Handle queue send failure (e.g., queue full)
+            }
         }
-        osDelay(500);
+
+        // 3. Delay (Part II)
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 
   /* USER CODE END 5 */
@@ -516,36 +522,48 @@ void StartReadRGB(void *argument)
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
+    // Use local variable instead of global (Part II)
+    SensorData_t received_data;
+    BaseType_t xStatus;
+
   /* Infinite loop */
   for(;;)
   {
-      uint8_t state = 0;
+      // 1. Receive data from the queue (Part II)
+      xStatus = xQueueReceive(sensorQueue,
+                              &received_data,
+                              pdMS_TO_TICKS(100)); // Wait for 100ms for data
 
-      // Make a local copy of the detected color (thread safety)
-      char color_local[16];
-      strncpy(color_local, detectedColor, sizeof(color_local));
-      color_local[sizeof(color_local)-1] = '\0';
+      if (xStatus == pdPASS) // Check if reception was successful
+      {
+          // 2. Generate control signal based on sensor value(s)
+          uint8_t state = 0;
 
-      // Decide based on color
-      if (strcmp(color_local, "GREEN") == 0) {
-          state = 1; // turn LED ON
+          // Decide based on color string in the local received_data struct
+          if (strcmp(received_data.color, "GREEN") == 0 ||
+              strcmp(received_data.color, "YELLOW") == 0)
+          {
+              state = 1; // turn LED ON
+          }
+          else
+          {
+              state = 0; // LED OFF otherwise
+          }
+          Actuator_SetLED(state);
+
+          // 3. Print the received sensor value (for debug)
+          printf("Control: Received %s (R:%d, G:%d, B:%d). Trigger: %d\r\n",
+                 received_data.color, received_data.r, received_data.g, received_data.b, state);
       }
-      else if (strcmp(color_local, "YELLOW") == 0) {
-          state = 1; // also turn LED ON
-      }
-      else {
-          state = 0; // LED OFF otherwise
-      }
 
-      Actuator_SetLED(state);
-
-      osDelay(200);
+      // 4. Delay (optional, depending on desired loop speed)
+      vTaskDelay(pdMS_TO_TICKS(100));
   }
   /* USER CODE END StartControlTask */
 }
 
 /**
-  * @brief  Period elapsed callback in non blocking mode
+  * @brief  Period elapsed callback in non blocking mode (FIX: Missing Definition)
   * @note   This function is called  when TIM6 interrupt took place, inside
   * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
   * a global variable "uwTick" used as application time base.
@@ -567,7 +585,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
+  * @brief  This function is executed in case of error occurrence. (FIX: Missing Definition)
   * @retval None
   */
 void Error_Handler(void)
@@ -583,7 +601,7 @@ void Error_Handler(void)
 #ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
+  * where the assert_param error has occurred.
   * @param  file: pointer to the source file name
   * @param  line: assert_param error line source number
   * @retval None

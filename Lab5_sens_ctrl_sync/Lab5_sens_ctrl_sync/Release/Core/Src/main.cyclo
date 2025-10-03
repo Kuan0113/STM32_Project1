@@ -1,0 +1,12 @@
+../Core/Src/main.c:212:6:SystemClock_Config	4
+../Core/Src/main.c:381:19:ISL29125_WriteRegister	1
+../Core/Src/main.c:386:19:ISL29125_ReadRegister	2
+../Core/Src/main.c:393:19:ISL29125_Init	1
+../Core/Src/main.c:110:5:main	5
+../Core/Src/main.c:407:19:ISL29125_ReadRGB255	1
+../Core/Src/main.c:433:6:Actuator_SetLED	1
+../Core/Src/main.c:522:6:StartControlTask	3
+../Core/Src/main.c:439:13:DetectColor	17
+../Core/Src/main.c:474:6:StartReadRGB	2
+../Core/Src/main.c:573:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:591:6:Error_Handler	1

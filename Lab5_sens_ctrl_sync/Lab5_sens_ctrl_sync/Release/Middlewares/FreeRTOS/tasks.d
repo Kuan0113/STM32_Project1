@@ -1,0 +1,26 @@
+Middlewares/FreeRTOS/tasks.o: \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/tasks.c \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
+ ../Core/Inc/FreeRTOSConfig.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/portable.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
+ C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/stack_macros.h
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h:
+../Core/Inc/FreeRTOSConfig.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/portable.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/task.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/list.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/timers.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/task.h:
+C:/Users/陳冠宇/STM32Cube/Repository/STM32Cube_FW_L4_V1.18.1/Middlewares/Third_Party/FreeRTOS/Source/include/stack_macros.h:
