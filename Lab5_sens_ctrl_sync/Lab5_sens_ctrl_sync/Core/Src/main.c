@@ -438,29 +438,26 @@ void Actuator_SetLED(uint8_t state) {
                       state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 const char* DetectColor(int r, int g, int b) {
-    // --- BLACK detection ---
-    if (r < 60 && g < 100 && 50 < b && b < 80) return "BLACK";
-
     // --- YELLOW detection ---
-    if (r > 240 && g > 240 && b > 190) return "YELLOW";
+    if (r > 250 && g > 250 && b > 240) return "YELLOW";
+
+    // --- GREEN detection (combines Light and Dark Green) ---
+    if ((g > 250 && r > 200 && b > 230) || (g > 250 && g - r > 100 && g - b > 60)) {
+        return "GREEN";
+    }
 
     // --- RED detection ---
-    if (r > 145 && g > 145) {
-        if (g - b > 60) return "RED";
+    if (r > 170 && g > 170 && g - b > 70) return "RED";
+
+    // --- BLUE detection (combines Light and Dark Blue) ---
+    if ((b > 250 && g > 250 && r < 100) || (b > 190 && g > 190 && r < 70)) {
+        return "BLUE";
     }
 
-    // --- GREEN (Dark/Light) detection ---
-    if (g > 250) {
-        if (g > r + 70 && g > b + 70) return "GREEN";
-        if (r > 150 && b > 150) return "GREEN";
-    }
+    // --- BLACK detection ---
+    if (r < 50 && g > 110 && b > 80) return "BLACK";
 
-    // --- BLUE (Dark/Light) detection ---
-    if (g > 170 && b > 170 && r < 100) {
-        if (b > r + 90) return "BLUE";
-    }
-
-    // Fallback if nothing matches cleanly
+    // Fallback if no specific color is detected
     return "UNKNOWN";
 }
 /* USER CODE END 4 */

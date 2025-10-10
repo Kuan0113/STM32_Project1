@@ -130,7 +130,7 @@ int main(void)
 
 	  if (ISL29125_ReadRGB255(&r, &g, &b) == HAL_OK) {
 		  const char* color = DetectColor(r, g, b);
-		  int len = snprintf(msg, sizeof(msg), "R=%d G=%d B=%d => %s\r\n", r, g, b, color);
+		  int len = snprintf(msg, sizeof(msg), "R=%d G=%d B=%d \r\n", r, g, b);
 	      HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 
 	  }
