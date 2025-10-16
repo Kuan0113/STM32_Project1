@@ -75,6 +75,7 @@ void Actuator_SetLED(uint8_t state);
 const char* DetectColor(int r, int g, int b);
 void SetSelectedColor(const char* color);
 void traceTaskSwitch(void);
+void HandleMenuInteraction(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -202,6 +203,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {}
 
 void traceTaskSwitch(void) {}
@@ -209,10 +211,9 @@ void traceTaskSwitch(void) {}
 void SetSelectedColor(const char* color) {
     strncpy(selectedColor, color, sizeof(selectedColor)-1);
     selectedColor[sizeof(selectedColor)-1] = '\0';
-    int len = snprintf(msg, sizeof(msg), "\r\n> Selected color set to: %s\r\n", selectedColor);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 }
 
+// --- THIS IS THE BLOCK OF MISSING CODE ---
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value) {
     uint8_t buf[2] = {reg, value};
     return HAL_I2C_Master_Transmit(&hi2c1, ISL29125_ADDR, buf, 2, HAL_MAX_DELAY);
@@ -248,6 +249,8 @@ const char* DetectColor(int r, int g, int b) {
     if (r < 50 && g > 110 && b > 80) return "BLACK";
     return "UNKNOWN";
 }
+// --- END OF MISSING CODE BLOCK ---
+
 /* USER CODE END 4 */
 
 /**
@@ -278,6 +281,64 @@ void StartReadRGB(void *argument)
 /**
 * @brief CONTROL & INPUT TASK: Manages user menu and controls the LED.
 */
+void HandleMenuInteraction(void)
+{
+    uint8_t rxByte;
+
+    // Take semaphore to pause SensorTask's printing
+    if (xSemaphoreTake(uartPrintSemaphore, portMAX_DELAY) == pdPASS)
+    {
+        const char *menu =
+            "\r\n--- SELECT A COLOR ---\r\n"
+            "1: RED\r\n2: GREEN\r\n3: BLUE\r\n4: YELLOW\r\n5: BLACK\r\n"
+            "Enter your choice followed by ENTER: ";
+        HAL_UART_Transmit(&huart2, (uint8_t*)menu, strlen(menu), HAL_MAX_DELAY);
+
+        char line[16];
+        uint8_t idx = 0;
+        while(1)
+        {
+            if(HAL_UART_Receive(&huart2, &rxByte, 1, HAL_MAX_DELAY) == HAL_OK) {
+                if (rxByte == '\r' || rxByte == '\n') { // Enter key
+                    line[idx] = '\0';
+                    HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+                    break;
+                } else if (rxByte == '\b' || rxByte == 127) { // Backspace key
+                    if (idx > 0) {
+                        idx--;
+                        HAL_UART_Transmit(&huart2, (uint8_t*)"\b \b", 3, HAL_MAX_DELAY);
+                    }
+                } else if (idx < sizeof(line)-1) { // Regular character
+                    line[idx++] = rxByte;
+                    HAL_UART_Transmit(&huart2, &rxByte, 1, HAL_MAX_DELAY);
+                }
+            }
+        }
+
+        int valid_choice = 1;
+        if(strcmp(line, "1") == 0) SetSelectedColor("RED");
+        else if(strcmp(line, "2") == 0) SetSelectedColor("GREEN");
+        else if(strcmp(line, "3") == 0) SetSelectedColor("BLUE");
+        else if(strcmp(line, "4") == 0) SetSelectedColor("YELLOW");
+        else if(strcmp(line, "5") == 0) SetSelectedColor("BLACK");
+        else valid_choice = 0;
+
+        if (valid_choice) {
+            int len = snprintf(msg, sizeof(msg), "> Selected color set to: %s\r\n", selectedColor);
+            HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+        } else {
+            HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n> Invalid choice\r\n", 20, HAL_MAX_DELAY);
+        }
+
+        // Give semaphore back to resume SensorTask's printing
+        xSemaphoreGive(uartPrintSemaphore);
+    }
+}
+
+
+/* USER CODE END 4 */
+
+
 void StartControlTask(void *argument)
 {
     SensorData_t received_data;
@@ -286,47 +347,15 @@ void StartControlTask(void *argument)
 
     for(;;)
     {
-        // Check for '*' to trigger the menu
         if (HAL_UART_Receive(&huart2, &rxByte, 1, 10) == HAL_OK)
         {
             if (rxByte == '*')
             {
-                // Take semaphore to pause SensorTask's printing
-                if (xSemaphoreTake(uartPrintSemaphore, portMAX_DELAY) == pdPASS)
-                {
-                    const char *menu =
-                        "\r\n--- SELECT A COLOR ---\r\n"
-                        "1: RED\r\n2: GREEN\r\n3: BLUE\r\n4: YELLOW\r\n5: BLACK\r\n"
-                        "Enter your choice followed by ENTER: ";
-                    HAL_UART_Transmit(&huart2, (uint8_t*)menu, strlen(menu), HAL_MAX_DELAY);
-
-                    char line[16];
-                    uint8_t idx = 0;
-                    while(1)
-                    {
-                        if(HAL_UART_Receive(&huart2, &rxByte, 1, HAL_MAX_DELAY) == HAL_OK) {
-                            if(rxByte == '\r' || rxByte == '\n') {
-                                line[idx] = '\0'; break;
-                            } else if(idx < sizeof(line)-1) {
-                                line[idx++] = rxByte;
-                            }
-                        }
-                    }
-
-                    if(strcmp(line, "1") == 0) SetSelectedColor("RED");
-                    else if(strcmp(line, "2") == 0) SetSelectedColor("GREEN");
-                    else if(strcmp(line, "3") == 0) SetSelectedColor("BLUE");
-                    else if(strcmp(line, "4") == 0) SetSelectedColor("YELLOW");
-                    else if(strcmp(line, "5") == 0) SetSelectedColor("BLACK");
-                    else HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n> Invalid choice\r\n", 20, HAL_MAX_DELAY);
-
-                    // Give semaphore back to resume SensorTask's printing
-                    xSemaphoreGive(uartPrintSemaphore);
-                }
+                // <<< CLEANER: Just call the menu function
+                HandleMenuInteraction();
             }
         }
 
-        // Check for sensor data to control the LED
         xStatus = xQueueReceive(sensorQueue, &received_data, pdMS_TO_TICKS(100));
         if (xStatus == pdPASS) {
             uint8_t state = (strcmp(received_data.color, selectedColor) == 0) ? 1 : 0;
