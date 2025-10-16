@@ -4,6 +4,16 @@
   * @file           : main.c
   * @brief          : Main program body
   ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2025 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -32,15 +42,27 @@ typedef struct {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ISL29125_ADDR         (0x44 << 1)
-#define ISL29125_REG_CONFIG1  0x01
-#define ISL29125_REG_GREEN_L  0x09
-#define ISL29125_REG_GREEN_H  0x0A
-#define ISL29125_REG_RED_L    0x0B
-#define ISL29125_REG_RED_H    0x0C
-#define ISL29125_REG_BLUE_L   0x0D
-#define ISL29125_REG_BLUE_H   0x0E
-#define CONFIG1_MODE_RGB_16BIT 0x05
+#define ISL29125_ADDR         (0x44 << 1)  // 7-bit address shifted for HAL
+
+// Register map
+#define ISL29125_REG_DEVICE_ID   0x00
+#define ISL29125_REG_CONFIG1     0x01
+#define ISL29125_REG_CONFIG2     0x02
+#define ISL29125_REG_CONFIG3     0x03
+#define ISL29125_REG_STATUS      0x08
+#define ISL29125_REG_GREEN_L     0x09
+#define ISL29125_REG_GREEN_H     0x0A
+#define ISL29125_REG_RED_L       0x0B
+#define ISL29125_REG_RED_H       0x0C
+#define ISL29125_REG_BLUE_L      0x0D
+#define ISL29125_REG_BLUE_H      0x0E
+
+// Config bits
+#define CONFIG1_MODE_RGB_16BIT   0x05   // RGB mode, 16-bit ADC, 375 lux
+#define CONFIG1_MODE_RGB_12BIT   0x0D   // RGB mode, 12-bit ADC, 375 lux
+#define CONFIG2_IR_MAX           0xBF   // Max IR compensation + IR offset
+#define CONFIG3_DEFAULT          0x00   // Default settings
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -74,7 +96,7 @@ HAL_StatusTypeDef ISL29125_ReadRGB255(int *r_val, int *g_val, int *b_val);
 void Actuator_SetLED(uint8_t state);
 const char* DetectColor(int r, int g, int b);
 void SetSelectedColor(const char* color);
-void traceTaskSwitch(void);
+void traceTaskSwitch(void){}
 void HandleMenuInteraction(void);
 /* USER CODE END PFP */
 
@@ -123,7 +145,17 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK) { Error_Handler(); }
+
+  /** Configure the main internal regulator output voltage
+  */
+  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
@@ -134,13 +166,24 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) { Error_Handler(); }
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) { Error_Handler(); }
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /**
@@ -148,6 +191,14 @@ void SystemClock_Config(void)
   */
 static void MX_I2C1_Init(void)
 {
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
   hi2c1.Init.Timing = 0x10D19CE4;
   hi2c1.Init.OwnAddress1 = 0;
@@ -157,9 +208,28 @@ static void MX_I2C1_Init(void)
   hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK) { Error_Handler(); }
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK) { Error_Handler(); }
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK) { Error_Handler(); }
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
@@ -167,6 +237,14 @@ static void MX_I2C1_Init(void)
   */
 static void MX_USART2_UART_Init(void)
 {
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
   huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
@@ -177,7 +255,14 @@ static void MX_USART2_UART_Init(void)
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK) { Error_Handler(); }
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
 }
 
 /**
@@ -186,27 +271,39 @@ static void MX_USART2_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+
+  /* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|Out_LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LD2_Pin Out_LED_Pin */
   GPIO_InitStruct.Pin = LD2_Pin|Out_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
+
 /* USER CODE BEGIN 4 */
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {}
-
-void traceTaskSwitch(void) {}
 
 void SetSelectedColor(const char* color) {
     strncpy(selectedColor, color, sizeof(selectedColor)-1);
@@ -242,14 +339,14 @@ void Actuator_SetLED(uint8_t state) {
 }
 
 const char* DetectColor(int r, int g, int b) {
-    if (r > 250 && g > 250 && b > 240) return "YELLOW";
+    if (r > 250 && g > 250 && b > 250) return "YELLOW";
     if ((g > 250 && r > 200 && b > 230) || (g > 250 && g - r > 100 && g - b > 60)) return "GREEN";
     if (r > 170 && g > 170 && g - b > 70) return "RED";
     if ((b > 250 && g > 250 && r < 100) || (b > 190 && g > 190 && r < 70)) return "BLUE";
     if (r < 50 && g > 110 && b > 80) return "BLACK";
     return "UNKNOWN";
 }
-// --- END OF MISSING CODE BLOCK ---
+
 
 /* USER CODE END 4 */
 
@@ -347,22 +444,27 @@ void StartControlTask(void *argument)
 
     for(;;)
     {
-        if (HAL_UART_Receive(&huart2, &rxByte, 1, 10) == HAL_OK)
+        // Non-blocking UART check (timeout 0)
+        if (HAL_UART_Receive(&huart2, &rxByte, 1, 0) == HAL_OK)
         {
             if (rxByte == '*')
-            {
-                // <<< CLEANER: Just call the menu function
                 HandleMenuInteraction();
-            }
         }
 
+        // Always poll queue
         xStatus = xQueueReceive(sensorQueue, &received_data, pdMS_TO_TICKS(100));
-        if (xStatus == pdPASS) {
-            uint8_t state = (strcmp(received_data.color, selectedColor) == 0) ? 1 : 0;
-            Actuator_SetLED(state);
+        if (xStatus == pdPASS)
+        {
+            if (strcmp(received_data.color, selectedColor) == 0)
+                Actuator_SetLED(1);
+            else
+                Actuator_SetLED(0);
         }
+
     }
 }
+
+
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {

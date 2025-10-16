@@ -539,7 +539,7 @@ void StartControlTask(void *argument)
 
           // Decide based on color string in the local received_data struct
           if (strcmp(received_data.color, "GREEN") == 0 ||
-              strcmp(received_data.color, "YELLOW") == 0)
+              strcmp(received_data.color, "BLUE") == 0)
           {
               state = 1; // turn LED ON
           }
