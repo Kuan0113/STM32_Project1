@@ -320,13 +320,29 @@ void Actuator_SetBuzzer(uint8_t state) {
 }
 
 const char* DetectColor(int r, int g, int b) {
-    if (r > 250 && g > 250 && b > 250) return "YELLOW";
-    if ((g > 250 && r > 200 && b > 230) || (g > 250 && g - r > 100 && g - b > 60)) return "GREEN";
-    if (r > 170 && g > 170 && g - b > 70) return "RED";
-    if ((b > 250 && g > 250 && r < 100) || (b > 190 && g > 190 && r < 70)) return "BLUE";
-    if (r < 50 && g > 110 && b > 80) return "BLACK";
+    // --- YELLOW ---
+    if (r > 240 && g > 240 && b < 245)
+        return "YELLOW";
+
+    // --- BLUE (covers light/dark) ---
+    if (r < 120 && g > 180 && b > 180)
+        return "BLUE";
+
+    // --- GREEN (covers light/dark) ---
+    if (r > 100 && r < 200 && g > 230 && b > 150)
+        return "GREEN";
+
+    // --- RED ---
+    if (r > 150 && g > 150 && b < 110)
+        return "RED";
+
+    // --- BLACK ---
+    if (r < 70 && g > 100 && b > 70 && g - r > 40)
+        return "BLACK";
+
     return "UNKNOWN";
 }
+
 
 void StartReadRGB(void *argument)
 {
