@@ -103,7 +103,6 @@ void Actuator_SetLED(uint8_t state);
 void Actuator_SetBuzzer(uint8_t state);
 const char* DetectColor(int r, int g, int b);
 void SetSelectedColor(const char* color);
-void traceTaskSwitch(void){}
 void HandleMenuInteraction(void);
 /* USER CODE END PFP */
 
