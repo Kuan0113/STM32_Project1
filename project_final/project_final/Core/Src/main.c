@@ -38,6 +38,13 @@ typedef struct {
     int b;
     char color[16];
 } SensorData_t;
+
+// Command type for ActuatorTask
+typedef enum {
+    ACTUATOR_CMD_OFF = 0,
+    ACTUATOR_CMD_ON = 1
+} ActuatorCommand_t;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -58,10 +65,7 @@ typedef struct {
 #define ISL29125_REG_BLUE_H      0x0E
 
 // Config bits
-#define CONFIG1_MODE_RGB_16BIT   0x05   // RGB mode, 16-bit ADC, 375 lux
-#define CONFIG1_MODE_RGB_12BIT   0x0D   // RGB mode, 12-bit ADC, 375 lux
-#define CONFIG2_IR_MAX           0xBF   // Max IR compensation + IR offset
-#define CONFIG3_DEFAULT          0x00   // Default settings
+#define CONFIG1_MODE_RGB_16BIT   0x05
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -72,15 +76,27 @@ typedef struct {
 I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1; // For Buzzer PWM
 UART_HandleTypeDef huart2;
-// Note: htim6 is likely handled by HAL internally for the timebase
 
 /* USER CODE BEGIN PV */
-char msg[128];
-QueueHandle_t sensorQueue;
-QueueHandle_t actuatorQueue;
-QueueHandle_t logQueue;
-SemaphoreHandle_t uartPrintSemaphore;
+// Queues
+QueueHandle_t sensorQueue;      // Sensor -> Control (Raw data)
+QueueHandle_t actuatorQueue;    // Control -> Actuator (Commands)
+QueueHandle_t LogQueue;         // ALL Tasks -> PrintTask (Text messages)
+
+// Semaphores & Mutexes
+SemaphoreHandle_t LogSemaphore; // Signals PrintTask [cite: 5757, 5785]
+SemaphoreHandle_t LogMutex;     // Protects UART (the "log file") [cite: 5758, 5807]
+
 char selectedColor[16] = "WHITE";
+
+// --- Static buffers for log messages ---
+// It's critical that tasks send pointers to persistent memory (static), not stack variables.
+static char sensorPrintMsg[128];
+static char controlLogMsg[128];
+static char actuatorLogMsg[64];
+static char menuPrintMsg[256];
+static char menuSelectMsg[64];
+static const char *invalidMsg = "\r\n> Invalid choice\r\n";
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -89,10 +105,12 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM1_Init(void);
+
+// Task Prototypes
 void StartReadRGB(void *argument);
 void StartControlTask(void *argument);
 void StartActuatorTask(void *argument);
-void StartLoggingTask(void *argument);
+void StartPrintTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 HAL_StatusTypeDef ISL29125_WriteRegister(uint8_t reg, uint8_t value);
@@ -120,30 +138,42 @@ int main(void)
   SystemClock_Config();
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   MX_I2C1_Init();
-  MX_TIM1_Init(); // Initialize the timer for PWM
-
   /* USER CODE BEGIN 2 */
   ISL29125_Init();
   /* USER CODE END 2 */
 
+  /* Create the semaphores(s) */
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  // Create the binary semaphore used to signal the PrintTask
+  LogSemaphore = xSemaphoreCreateBinary();
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* Create the mutex(es) */
+  /* USER CODE BEGIN RTOS_MUTEXES */
+  // Create the mutex to protect the UART
+  LogMutex = xSemaphoreCreateMutex();
+  /* USER CODE END RTOS_MUTEXES */
+
+  /* Create the queue(s) */
   /* USER CODE BEGIN RTOS_QUEUES */
   sensorQueue = xQueueCreate(1, sizeof(SensorData_t));
-  actuatorQueue = xQueueCreate(1, sizeof(uint8_t));
-  logQueue = xQueueCreate(5, sizeof(SensorData_t));
-  uartPrintSemaphore = xSemaphoreCreateBinary();
-  if (uartPrintSemaphore != NULL) {
-      xSemaphoreGive(uartPrintSemaphore);
-  }
+  actuatorQueue = xQueueCreate(5, sizeof(ActuatorCommand_t));
+  // Create the log queue to hold text-based messages (pointers to strings)
+  LogQueue = xQueueCreate(15, sizeof(char*));
   /* USER CODE END RTOS_QUEUES */
 
+  /* Create the thread(s) */
   /* USER CODE BEGIN RTOS_THREADS */
+  // Priority: Print > Sensor/Actuator > Control
+  xTaskCreate(StartPrintTask, "PrintTask", 256, NULL, 3, NULL);
   xTaskCreate(StartReadRGB, "SensorTask", 256, NULL, 2, NULL);
+  xTaskCreate(StartActuatorTask, "ActuatorTask", 256, NULL, 2, NULL);
   xTaskCreate(StartControlTask, "ControlTask", 256, NULL, 1, NULL);
-  xTaskCreate(StartActuatorTask, "ActuatorTask", 256, NULL, 1, NULL);
-  xTaskCreate(StartLoggingTask, "LoggingTask", 256, NULL, 1, NULL);
   /* USER CODE END RTOS_THREADS */
 
+  /* Start scheduler */
   vTaskStartScheduler();
 
   while (1) {}
@@ -328,95 +358,102 @@ void Actuator_SetBuzzer(uint8_t state) {
 
 const char* DetectColor(int r, int g, int b) {
     // --- YELLOW ---
-    if (r > 240 && g > 240 && b < 245)
-        return "YELLOW";
-
+    if (r > 240 && g > 240 && b < 245) return "YELLOW";
     // --- BLUE (covers light/dark) ---
-    if (r < 120 && g > 180 && b > 180)
-        return "BLUE";
-
+    if (r < 120 && g > 180 && b > 180) return "BLUE";
     // --- GREEN (covers light/dark) ---
-    if (r > 100 && r < 200 && g > 230 && b > 150)
-        return "GREEN";
-
+    if (r > 100 && r < 200 && g > 230 && b > 150) return "GREEN";
     // --- RED ---
-    if (r > 150 && g > 150 && b < 110)
-        return "RED";
-
+    if (r > 150 && g > 150 && b < 110) return "RED";
     // --- BLACK ---
-    if (r < 70 && g > 100 && b > 70 && g - r > 40)
-        return "BLACK";
+    if (r < 70 && g > 100 && b > 70 && g - r > 40) return "BLACK";
     // --- WHITE
-    if (r > 250 && g > 250 && b > 250)
-        return "WHITE";
+    if (r > 250 && g > 250 && b > 250) return "WHITE";
 
     return "UNKNOWN";
 }
 
+void HandleMenuInteraction(void)
+{
+    // Pointers to our static buffers
+    char *pMenuMsg = menuPrintMsg;
+    char *pSelectMsg = menuSelectMsg;
+    const char *pInvalidMsg = invalidMsg; // Pointer to a const string is fine
+    const char *newline = "\r\n"; // Also a const string
+
+    // 1. Queue the menu for printing
+    snprintf(pMenuMsg, 256, // Use the size of the buffer
+            "\r\n--- SELECT A COLOR ---\r\n"
+            "1: RED\r\n2: GREEN\r\n3: BLUE\r\n4: YELLOW\r\n5: BLACK\r\n6: WHITE\r\n"
+            "Enter your choice followed by ENTER: ");
+    xQueueSend(LogQueue, &pMenuMsg, 0);
+    xSemaphoreGive(LogSemaphore);
+
+    // 2. Give PrintTask time to run before we block for input
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    // 3. Handle interactive input directly (necessary for echo)
+    uint8_t rxByte;
+    char line[16];
+    uint8_t idx = 0;
+    while(1)
+    {
+        if(HAL_UART_Receive(&huart2, &rxByte, 1, HAL_MAX_DELAY) == HAL_OK) {
+            if (rxByte == '\r' || rxByte == '\n') {
+                line[idx] = '\0';
+                HAL_UART_Transmit(&huart2, (uint8_t*)newline, strlen(newline), HAL_MAX_DELAY);
+                break;
+            } else if ((rxByte == '\b' || rxByte == 127) && idx > 0) {
+                 idx--;
+                 HAL_UART_Transmit(&huart2, (uint8_t*)"\b \b", 3, HAL_MAX_DELAY);
+            } else if (idx < sizeof(line)-1 && isprint(rxByte)) {
+                line[idx++] = rxByte;
+                HAL_UART_Transmit(&huart2, &rxByte, 1, HAL_MAX_DELAY);
+            }
+        }
+    }
+
+    // 4. Process choice and queue the result message
+    int valid_choice = 1;
+    if(strcmp(line, "1") == 0) SetSelectedColor("RED");
+    else if(strcmp(line, "2") == 0) SetSelectedColor("GREEN");
+    else if(strcmp(line, "3") == 0) SetSelectedColor("BLUE");
+    else if(strcmp(line, "4") == 0) SetSelectedColor("YELLOW");
+    else if(strcmp(line, "5") == 0) SetSelectedColor("BLACK");
+    else if(strcmp(line, "6") == 0) SetSelectedColor("WHITE");
+    else valid_choice = 0;
+
+    if (valid_choice) {
+        snprintf(pSelectMsg, 64, "> Selected color set to: %s\r\n", selectedColor);
+        xQueueSend(LogQueue, &pSelectMsg, 0);
+    } else {
+        xQueueSend(LogQueue, &pInvalidMsg, 0);
+    }
+    xSemaphoreGive(LogSemaphore); // Signal PrintTask
+}
 
 void StartReadRGB(void *argument)
 {
     SensorData_t sensor_data;
+    char *pPrintMsg = sensorPrintMsg; // Pointer to the static buffer
+
     for(;;)
     {
         if (ISL29125_ReadRGB255(&sensor_data.r, &sensor_data.g, &sensor_data.b) == HAL_OK) {
             const char* color = DetectColor(sensor_data.r, sensor_data.g, sensor_data.b);
             strncpy(sensor_data.color, color, sizeof(sensor_data.color)-1);
+            sensor_data.color[sizeof(sensor_data.color)-1] = '\0'; // Ensure null-termination
 
-            if (xSemaphoreTake(uartPrintSemaphore, portMAX_DELAY) == pdPASS)
-            {
-                int len = snprintf(msg, sizeof(msg), "R=%-3d G=%-3d B=%-3d | Detected: %s\r\n",
-                                   sensor_data.r, sensor_data.g, sensor_data.b, color);
-                HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-                xSemaphoreGive(uartPrintSemaphore);
-            }
+            // 1. Send raw data to ControlTask
             xQueueSend(sensorQueue, &sensor_data, 0);
+
+            // 2. Format and send the display string to the PrintTask (via LogQueue)
+            snprintf(sensorPrintMsg, sizeof(sensorPrintMsg), "R=%-3d G=%-3d B=%-3d | Detected: %s\r\n",
+                     sensor_data.r, sensor_data.g, sensor_data.b, color);
+            xQueueSend(LogQueue, &pPrintMsg, 0);
+            xSemaphoreGive(LogSemaphore);  // Signal the PrintTask
         }
         vTaskDelay(pdMS_TO_TICKS(500));
-    }
-}
-
-void HandleMenuInteraction(void)
-{
-    uint8_t rxByte;
-    if (xSemaphoreTake(uartPrintSemaphore, portMAX_DELAY) == pdPASS)
-    {
-        const char *menu =
-            "\r\n--- SELECT A COLOR ---\r\n"
-            "1: RED\r\n2: GREEN\r\n3: BLUE\r\n4: YELLOW\r\n5: BLACK\r\n6: WHITE\r\n"
-            "Enter your choice followed by ENTER: ";
-        HAL_UART_Transmit(&huart2, (uint8_t*)menu, strlen(menu), HAL_MAX_DELAY);
-        char line[16];
-        uint8_t idx = 0;
-        while(1)
-        {
-            if(HAL_UART_Receive(&huart2, &rxByte, 1, HAL_MAX_DELAY) == HAL_OK) {
-                if (rxByte == '\r' || rxByte == '\n') {
-                    line[idx] = '\0';
-                    HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
-                    break;
-                } else if (rxByte == '\b' || rxByte == 127) {
-                    if (idx > 0) { idx--; HAL_UART_Transmit(&huart2, (uint8_t*)"\b \b", 3, HAL_MAX_DELAY); }
-                } else if (idx < sizeof(line)-1) {
-                    line[idx++] = rxByte; HAL_UART_Transmit(&huart2, &rxByte, 1, HAL_MAX_DELAY);
-                }
-            }
-        }
-        int valid_choice = 1;
-        if(strcmp(line, "1") == 0) SetSelectedColor("RED");
-        else if(strcmp(line, "2") == 0) SetSelectedColor("GREEN");
-        else if(strcmp(line, "3") == 0) SetSelectedColor("BLUE");
-        else if(strcmp(line, "4") == 0) SetSelectedColor("YELLOW");
-        else if(strcmp(line, "5") == 0) SetSelectedColor("BLACK");
-        else if(strcmp(line, "6") == 0) SetSelectedColor("WHITE");
-        else valid_choice = 0;
-        if (valid_choice) {
-            int len = snprintf(msg, sizeof(msg), "> Selected color set to: %s\r\n", selectedColor);
-            HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-        } else {
-            HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n> Invalid choice\r\n", 20, HAL_MAX_DELAY);
-        }
-        xSemaphoreGive(uartPrintSemaphore);
     }
 }
 
@@ -425,119 +462,122 @@ void StartControlTask(void *argument)
     SensorData_t received_data;
     BaseType_t xStatus;
     uint8_t rxByte;
-    uint8_t actuator_cmd;
+    ActuatorCommand_t actuatorCmd;
+    char *pLogMsg = controlLogMsg; // Pointer to the static buffer
 
     for(;;)
     {
-        // ... (UART menu check) ...
+        // Non-blocking check for menu activation character '*'
         if (HAL_UART_Receive(&huart2, &rxByte, 1, 0) == HAL_OK)
         {
             if (rxByte == '*')
                 HandleMenuInteraction();
         }
 
+        // Wait for sensor data with a timeout
         xStatus = xQueueReceive(sensorQueue, &received_data, pdMS_TO_TICKS(100));
 
-        if (xStatus == pdPASS)
+        if (xStatus == pdPASS) // If sensor data was received
         {
+            // Perform matching logic
             if (strcmp(received_data.color, selectedColor) == 0) {
-                actuator_cmd = 1; // Set command to ON
-                xQueueSend(logQueue, &received_data, 0);
-
+                actuatorCmd = ACTUATOR_CMD_ON;
+                //snprintf(pLogMsg, 128, "[CONTROL LOG] Match Found! Detected: %s\r\n", received_data.color);
             } else {
-                actuator_cmd = 0; // Set command to OFF
+                actuatorCmd = ACTUATOR_CMD_OFF;
+                //snprintf(pLogMsg, 128, "[CONTROL LOG] No Match. Detected: %s\r\n", received_data.color);
             }
 
-            xQueueSend(actuatorQueue, &actuator_cmd, 0);
+            // Send command to ActuatorTask
+            xQueueSend(actuatorQueue, &actuatorCmd, 0);
+
+            // Send log message to PrintTask
+            xQueueSend(LogQueue, &pLogMsg, 0);
+            xSemaphoreGive(LogSemaphore);
         }
+         vTaskDelay(pdMS_TO_TICKS(10)); // Prevent this low-priority task from starving others if queue is always empty
     }
 }
+
 /**
   * @brief Function implementing the ActuatorTask thread.
-  * @param argument: Not used
-  * @retval None
   */
 void StartActuatorTask(void *argument)
 {
-  uint8_t command;
-  BaseType_t xStatus;
+  ActuatorCommand_t command;
+  char *pLogMsg = actuatorLogMsg; // Pointer to static buffer
+  ActuatorCommand_t lastCmd = ACTUATOR_CMD_OFF; // State to avoid spamming logs
 
   for(;;)
   {
     // Wait indefinitely for a command from the control task
-    xStatus = xQueueReceive(actuatorQueue, &command, portMAX_DELAY);
-
-    // Ensure we successfully received a command
-    if (xStatus == pdPASS)
+    if (xQueueReceive(actuatorQueue, &command, portMAX_DELAY) == pdPASS)
     {
-      if (command == 1)
+      // Only log if the state *changes*
+      if (command != lastCmd)
       {
-        // --- MATCH DETECTED ---
-        // Turn on the LED (it will stay on as long as we get '1' commands)
-        Actuator_SetLED(1);
+          if (command == ACTUATOR_CMD_ON)
+          {
+            snprintf(pLogMsg, 64, "[ACTUATOR LOG] Turning ON\r\n");
+            Actuator_SetLED(1);
+            Actuator_SetBuzzer(1);
+          }
+          else
+          {
+            snprintf(pLogMsg, 64, "[ACTUATOR LOG] Turning OFF\r\n");
+            Actuator_SetLED(0);
+            Actuator_SetBuzzer(0);
+          }
+          lastCmd = command;
 
-        // Send a 10ms pulse to the buzzer
-        Actuator_SetBuzzer(1);
-        vTaskDelay(pdMS_TO_TICKS(10));
-        Actuator_SetBuzzer(0);
-      }
-      else
-      {
-        // --- NO MATCH ---
-        // Turn off the LED
-        Actuator_SetLED(0);
-        // Ensure the buzzer is off
-        Actuator_SetBuzzer(0);
+          // Send the log message and signal the PrintTask
+          xQueueSend(LogQueue, &pLogMsg, 0);
+          xSemaphoreGive(LogSemaphore);
       }
     }
   }
 }
+
 /**
-  * @brief Function implementing the LoggingTask thread.
-  * @param argument: Not used
-  * @retval None
+  * @brief
   */
-void StartLoggingTask(void *argument)
+void StartPrintTask(void *argument)
 {
-  SensorData_t log_data;
-  BaseType_t xStatus;
+  char *pMessageToPrint;
 
   for(;;)
   {
-    // Wait indefinitely for a log message from the control task
-    xStatus = xQueueReceive(logQueue, &log_data, portMAX_DELAY);
-
-    if (xStatus == pdPASS)
+    // 1. Wait to be signaled by the LogSemaphore
+    if (xSemaphoreTake(LogSemaphore, portMAX_DELAY) == pdTRUE)
     {
-      // Safely print the log message
-      if (xSemaphoreTake(uartPrintSemaphore, pdMS_TO_TICKS(100)) == pdPASS)
+      // 2. A signal was received. Drain the LogQueue completely.
+      while (xQueueReceive(LogQueue, &pMessageToPrint, 0) == pdTRUE)
       {
-        int len = snprintf(msg, sizeof(msg), "[LOG] Match Detected: %s (R=%d, G=%d, B=%d)\r\n",
-                           log_data.color, log_data.r, log_data.g, log_data.b);
-        HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
-        xSemaphoreGive(uartPrintSemaphore);
+        // 3. Acquire the LogMutex to protect the UART
+        if (xSemaphoreTake(LogMutex, portMAX_DELAY) == pdTRUE)
+        {
+          // 4. Write the log message to the "file" (UART)
+          HAL_UART_Transmit(&huart2, (uint8_t*)pMessageToPrint, strlen(pMessageToPrint), HAL_MAX_DELAY);
+
+          // 5. Release the mutex [cite: 5819, 5820]
+          xSemaphoreGive(LogMutex);
+        }
       }
     }
   }
 }
-/* USER CODE END 4 */
 /* USER CODE END 4 */
 
 
 /**
   * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM6 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM6) { // *** CORRECTED: Using TIM6 for HAL Tick ***
+  if (htim->Instance == TIM6) {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
@@ -547,7 +587,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 /**
   * @brief  This function is executed in case of error occurrence.
-  * @retval None
   */
 void Error_Handler(void)
 {
