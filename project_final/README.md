@@ -16,6 +16,15 @@ The system is built on four main tasks, each with a distinct responsibility. Com
 
 * `PrintTask` (Priority 3): The "Logging Task". Manages all UART console output.
 
+## ⚙️ Hardware Components
+This project integrates three primary hardware components to create an interactive color-sorting system.
+
+* Microcontroller: ST NUCLEO-L476RG This is the main development board, which hosts the STM32L476RG microcontroller. This powerful, low-power ARM Cortex-M4 chip runs the FreeRTOS kernel and all the application tasks. It provides the necessary GPIO, I2C, and Timer peripherals to interface with the sensor and actuator.
+
+* Color Sensor: ISL29125 A high-sensitivity RGB (Red, Green, Blue) color sensor that communicates over the I2C bus. The SensorTask polls this device to get 16-bit raw data for each color channel. This data is then processed to determine the name of the color being detected (e.g., "WHITE", "RED", "BLUE").
+
+* Active Buzzer: GT-0950RP3 This is an active piezoelectric buzzer that acts as an audible actuator. It only requires a DC voltage to operate (provided by a PWM signal from the STM32's TIM1 timer). The ActuatorTask controls this buzzer, turning it on to signal a successful color match.
+
 ## 📌 Task Descriptions & Responsibilities
 
 * StartReadRGB **(SensorTask)**
