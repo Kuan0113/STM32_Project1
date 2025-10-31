@@ -180,21 +180,21 @@ void StartControlTask(void *argument)
 }
 ```
 ## 🖥️ How to Use
-Compile and flash the code to the STM32 board.
+1. Compile and flash the code to the STM32 board.
 
-Connect to the board using a serial terminal (like PuTTY) at 115200 baud.
+2. Connect to the board using a serial terminal (like PuTTY) at 115200 baud.
 
-You will see a continuous stream of sensor readings printed to the console.
+3. You will see a continuous stream of sensor readings printed to the console.
 
-The system defaults to matching the color WHITE.
+4. The system defaults to matching the color WHITE.
 
-Place a white object over the sensor. You should see the Out_LED_Pin light up and the buzzer turn on.
+5. Place a white object over the sensor. You should see the Out_LED_Pin light up and the buzzer turn on.
 
-To change the target color, press the * key in the terminal.
+6. To change the target color, press the * key in the terminal.
 
-A menu will be printed. Type a number (e.g., 1 for RED) and press Enter.
+7. A menu will be printed. Type a number (e.g., 1 for RED) and press Enter.
 
-A confirmation message will be printed, and the system will now only activate the actuators when RED is detected.
+8. A confirmation message will be printed, and the system will now only activate the actuators when RED is detected.
 
 ## ✅ Demo (Expected Output)
 The terminal output will show sensor readings, control logic decisions, and actuator actions all printing in the correct order, managed by the PrintTask.
