@@ -1,4 +1,4 @@
-# Final Demo - Event-Driven Color Sorter using FreeRTOS
+# Event-Driven Color Sorter using FreeRTOS
 
 ## 🚀 Project Overview
 This is a real-time embedded application for the STM32 platform that demonstrates a modular, event-driven system using FreeRTOS. The project integrates multiple tasks to perform color sensing, control logic, actuator output, and centralized logging.
